@@ -148,21 +148,24 @@ def proxy_model_api(model_name, subpath):
         return f"Model {model_name} is not running", 404
 
     port = gradio_servers[model_name]["port"]
-    # Build the target URL (note the leading '/' for subpath)
+
+    # Build the target URL (note the leading '/' for subpath) and include query parameters
     target_url = f"http://localhost:{port}/{subpath}"
-    print(f"Proxying request for {model_name} to {target_url}")
+    params = dict(request.args)
+    if "session_hash" not in params:
+        params["session_hash"] = "1234"
+    print(f"Proxying request for {model_name} to {target_url} with params {params}")
 
     # Forward the original request (method, headers, data, etc)
     resp = requests.request(
         method=request.method,
         url=target_url,
+        params=params,
         headers={key: value for key, value in request.headers if key != "Host"},
         data=request.get_data(),
         cookies=request.cookies,
         allow_redirects=False
     )
-
-    # Exclude certain headers from the proxied response
     excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
     headers = [(name, value) for name, value in resp.raw.headers.items() if name.lower() not in excluded_headers]
 
