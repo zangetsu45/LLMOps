@@ -107,7 +107,7 @@ def model_specific(model_name):
         model_folder = os.path.join(UPLOAD_FOLDER, model_name)
         # Launch the model process without forcing a port.
         # Since we cannot modify test.py, we capture its stdout to parse the port at runtime.
-        model_file = os.path.join(model_folder, "test.py")
+        model_file = os.path.join(model_folder, "app.py")
         print(f"Launching model server for {model_name}...")
         print(f"Model file: {model_file}")
 
@@ -119,7 +119,7 @@ def model_specific(model_name):
         env["GRADIO_SERVER_PORT"] = str(port)
         env["GRADIO_ROOT_PATH"] = f"/models/{model_name}"
         process = subprocess.Popen(
-            ["python", "test.py"],
+            ["python", "app.py"],
             cwd=model_folder,
             env=env,
         )
