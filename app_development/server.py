@@ -1,4 +1,4 @@
-from flask import Flask, request, redirect, url_for
+from flask import Flask, request, redirect, url_for, Response
 from flask import render_template_string
 import os
 import threading
@@ -7,6 +7,7 @@ import gradio as gr
 import subprocess
 import socket
 import re, time
+import requests
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "models"
@@ -116,7 +117,7 @@ def model_specific(model_name):
         s.close()
         env = os.environ.copy()
         env["GRADIO_SERVER_PORT"] = str(port)
-
+        env["GRADIO_ROOT_PATH"] = f"/models/{model_name}"
         process = subprocess.Popen(
             ["python", "test.py"],
             cwd=model_folder,
@@ -139,6 +140,33 @@ def model_specific(model_name):
     </html>
     """
     return iframe_page
+
+@app.route("/model/<model_name>/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+def proxy_model_api(model_name, subpath):
+    # Ensure the model's Gradio container is running
+    if model_name not in gradio_servers:
+        return f"Model {model_name} is not running", 404
+
+    port = gradio_servers[model_name]["port"]
+    # Build the target URL (note the leading '/' for subpath)
+    target_url = f"http://localhost:{port}/{subpath}"
+    print(f"Proxying request for {model_name} to {target_url}")
+
+    # Forward the original request (method, headers, data, etc)
+    resp = requests.request(
+        method=request.method,
+        url=target_url,
+        headers={key: value for key, value in request.headers if key != "Host"},
+        data=request.get_data(),
+        cookies=request.cookies,
+        allow_redirects=False
+    )
+
+    # Exclude certain headers from the proxied response
+    excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
+    headers = [(name, value) for name, value in resp.raw.headers.items() if name.lower() not in excluded_headers]
+
+    return Response(resp.content, resp.status_code, headers)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
