@@ -23,6 +23,8 @@ def index():
       <p><a href="/models">List Available Models</a></p>
       <h3>Upload a New Model</h3>
       <form action="/upload" method="post" enctype="multipart/form-data">
+         <label>Model Name:</label>
+         <input type="text" name="model_name"><br><br>
          <label>Model Definition (app.py):</label>
          <input type="file" name="model_definition"><br><br>
          <label>Model Weights (model.pth):</label>
@@ -43,6 +45,11 @@ def upload_model():
         if file_key not in request.files:
             return f"No file provided for {file_key}", 400
 
+    # Get model_name from form data
+    model_name = request.form.get("model_name", "").strip()
+    if not model_name:
+        return "Model name is required", 400
+
     model_def_file = request.files["model_definition"]
     weights_file = request.files["model_weights"]
     req_file = request.files["requirements"]
@@ -50,14 +57,14 @@ def upload_model():
     if model_def_file.filename == "" or weights_file.filename == "" or req_file.filename == "":
         return "One or more files were not selected", 400
 
-    # Use the uploaded model definition filename (without extension) as the model identifier.
-    filename_base = os.path.splitext(secure_filename(model_def_file.filename))[0]
-    model_folder = os.path.join(UPLOAD_FOLDER, filename_base)
+    # Use the provided model_name (force sanitized) as the model identifier.
+    model_folder = os.path.join(UPLOAD_FOLDER, secure_filename(model_name))
     os.makedirs(model_folder, exist_ok=True)
 
-    model_def_path = os.path.join(model_folder, secure_filename(model_def_file.filename))
+    # Force saving the model definition as app.py and requirements as requirements.txt.
+    model_def_path = os.path.join(model_folder, "app.py")
     weights_path = os.path.join(model_folder, secure_filename(weights_file.filename))
-    req_path = os.path.join(model_folder, secure_filename(req_file.filename))
+    req_path = os.path.join(model_folder, "requirements.txt")
 
     model_def_file.save(model_def_path)
     weights_file.save(weights_path)
@@ -100,32 +107,24 @@ def model_specific(model_name):
         # Launch the model process without forcing a port.
         # Since we cannot modify test.py, we capture its stdout to parse the port at runtime.
         model_file = os.path.join(model_folder, "test.py")
+        print(f"Launching model server for {model_name}...")
+        print(f"Model file: {model_file}")
+
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('', 0))
+        port = s.getsockname()[1]
+        s.close()
+        env = os.environ.copy()
+        env["GRADIO_SERVER_PORT"] = str(port)
+
         process = subprocess.Popen(
-            ["python", model_file],
+            ["python", "test.py"],
             cwd=model_folder,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
+            env=env,
         )
-
-        # Wait until Gradio prints the local URL which includes the port.
-        port = None
-        start_time = time.time()
-        while time.time() - start_time < 30:  # wait max 30 seconds
-            output_line = process.stdout.readline()
-            if output_line:
-                match = re.search(r"http://127\.0\.0\.1:(\d+)", output_line)
-                if match:
-                    port = int(match.group(1))
-                    break
-            time.sleep(0.1)
-        
-        if port is None:
-            port = 7860  # fallback if port cannot be determined
-            gradio_servers[model_name] = {"port": port, "process": process}
-        else:
-            port = gradio_servers[model_name]["port"]
-
+        gradio_servers[model_name] = {"process": process, "port": port}
+    else :
+        port = gradio_servers[model_name]["port"]
     # Return a wrapper HTML page hosting the Gradio interface in an iframe.
     iframe_page = f"""
     <html>
