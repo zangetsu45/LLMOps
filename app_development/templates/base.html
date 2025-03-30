@@ -9,7 +9,7 @@
   <!-- Navbar -->
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
-      <a class="navbar-brand" href="{{ url_for('index') }}">Model Server</a>
+      <a class="navbar-brand" href="{{ url_for('index') }}">{% block brand_text %}Model Server{% endblock %}</a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -21,6 +21,7 @@
           <li class="nav-item">
             <a class="nav-link" href="{{ url_for('list_models') }}">Models List</a>
           </li>
+          {% block extra_nav %}{% endblock %}
         </ul>
       </div>
     </div>

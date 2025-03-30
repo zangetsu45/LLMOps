@@ -64,7 +64,7 @@ gradio_servers = {}
 @app.route("/model/<model_name>", methods=["GET"])
 def model_specific(model_name):
     # Check if the model exists in our models directory.
-    if model_name not in os.listdir(UPLOAD_FOLDER):
+    if (model_name not in os.listdir(UPLOAD_FOLDER)):
         return "Model not found", 404
 
     # If this model's server hasn't been started yet, create and launch it.
@@ -125,6 +125,18 @@ def proxy_model_api(model_name, subpath):
     headers = [(name, value) for name, value in resp.raw.headers.items() if name.lower() not in excluded_headers]
 
     return Response(resp.content, resp.status_code, headers)
+
+# Add new routes for API Doc and Instances Running under a specific model
+@app.route("/model/<model_name>/api_doc")
+def api_doc_model(model_name):
+    if model_name not in os.listdir(UPLOAD_FOLDER):
+        return "Model not found", 404
+    return render_template("api_doc.html", model_name=model_name)
+
+@app.route("/model/<model_name>/instances")
+def instances_model(model_name):
+    count = 1 if model_name in gradio_servers else 0
+    return render_template("instances.html", model_name=model_name, count=count)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
