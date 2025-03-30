@@ -1,5 +1,4 @@
-from flask import Flask, request, redirect, url_for, Response
-from flask import render_template_string
+from flask import Flask, request, redirect, url_for, Response, render_template
 import os
 import threading
 from werkzeug.utils import secure_filename
@@ -16,27 +15,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Home page: links to list models and model upload form
 @app.route("/")
 def index():
-    return """
-    <html>
-    <head><title>Model Server</title></head>
-    <body>
-      <h1>Welcome to the Model Server</h1>
-      <p><a href="/models">List Available Models</a></p>
-      <h3>Upload a New Model</h3>
-      <form action="/upload" method="post" enctype="multipart/form-data">
-         <label>Model Name:</label>
-         <input type="text" name="model_name"><br><br>
-         <label>Model Definition (app.py):</label>
-         <input type="file" name="model_definition"><br><br>
-         <label>Model Weights (model.pth):</label>
-         <input type="file" name="model_weights"><br><br>
-         <label>Requirements (requirements.txt):</label>
-         <input type="file" name="requirements"><br><br>
-         <input type="submit" value="Upload">
-      </form>
-    </body>
-    </html>
-    """
+    return render_template("index.html")
 
 # Endpoint to handle model uploads
 @app.route("/upload", methods=["POST"])
@@ -77,21 +56,7 @@ def upload_model():
 @app.route("/models", methods=["GET"])
 def list_models():
     models = os.listdir(UPLOAD_FOLDER)
-    model_links = "".join(
-        [f'<li><a href="/model/{model}">{model}</a></li>' for model in models]
-    )
-    return f"""
-    <html>
-    <head><title>Available Models</title></head>
-    <body>
-      <h1>Available Models</h1>
-      <ul>
-        {model_links}
-      </ul>
-      <p><a href="/">Go Back Home</a></p>
-    </body>
-    </html>
-    """
+    return render_template("models.html", models=models)
 
 # Dictionary to store launched gradio interfaces and their ports.
 gradio_servers = {}
@@ -117,30 +82,20 @@ def model_specific(model_name):
         s.close()
         env = os.environ.copy()
         env["GRADIO_SERVER_PORT"] = str(port)
-        env["GRADIO_ROOT_PATH"] = f"/models/{model_name}"
+        env["GRADIO_ROOT_PATH"] = f"/model/{model_name}"
         process = subprocess.Popen(
             ["python", "app.py"],
             cwd=model_folder,
             env=env,
         )
         gradio_servers[model_name] = {"process": process, "port": port}
-    else :
+    else:
         port = gradio_servers[model_name]["port"]
-    # Return a wrapper HTML page hosting the Gradio interface in an iframe.
-    iframe_page = f"""
-    <html>
-    <head>
-      <title>Model Interface - {model_name}</title>
-    </head>
-    <body>
-      <h1>{model_name} Interface</h1>
-      <iframe src="http://localhost:{port}" width="100%" height="600px" frameBorder="0"></iframe>
-      <p><a href="/models">Back to Models List</a></p>
-    </body>
-    </html>
-    """
-    return iframe_page
+    # Return a template hosting the Gradio interface in an iframe.
+    return render_template("model_interface.html", model_name=model_name, port=port)
 
+
+# Endpoint to handle model API requests does not get called in frontend
 @app.route("/model/<model_name>/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 def proxy_model_api(model_name, subpath):
     # Ensure the model's Gradio container is running

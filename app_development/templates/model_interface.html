@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Model Interface - {{ model_name }}{% endblock %}
+{% block content %}
+  <h1 class="mb-3">{{ model_name }} Interface</h1>
+  <div class="ratio ratio-16x9 mb-3" style="height: 600px;">
+    <iframe src="http://localhost:{{ port }}/model/{{ model_name }}"></iframe>
+  </div>
+{% endblock %}
